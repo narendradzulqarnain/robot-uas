@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['person']
+
+roboflow:
+  workspace: uas-robotika
+  project: person-detection-aclqb
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/uas-robotika/person-detection-aclqb/dataset/2
