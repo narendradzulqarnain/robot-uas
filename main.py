@@ -69,7 +69,11 @@ def main():
                 abs_face = (x1+fx1, y1+fy1, x1+fx2, y1+fy2)
                 face_bboxes.append(abs_face)
                 face_img = frame[abs_face[1]:abs_face[3], abs_face[0]:abs_face[2]]
-                label = face_recognizer.recognize(face_img)
+                # Check if face_img is valid before recognition
+                if face_img is not None and face_img.size > 0 and face_img.shape[0] > 0 and face_img.shape[1] > 0:
+                    label = face_recognizer.recognize(face_img)
+                else:
+                    label = None
                 face_labels.append(label if label else "Unknown")
                 person_labels.append(label if label else "person")
             if not faces:
