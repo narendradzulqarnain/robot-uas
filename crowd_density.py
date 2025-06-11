@@ -7,7 +7,7 @@ from scipy.spatial.distance import cdist
 
 class CrowdDensityCalculator:
     def __init__(self, config):
-        self.dist_threshold = 75  # pixel distance threshold for 'crowded'
+        self.dist_threshold = 120  # pixel distance threshold for 'crowded'
         self.crowd_count_threshold = 3  # number of close people to trigger 'crowded'
 
     def calculate(self, person_bboxes):
