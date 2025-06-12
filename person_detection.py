@@ -8,26 +8,15 @@ import torch
 
 class PersonDetector:
     def __init__(self, config):
-        # Load YOLOv11n model (pretrained or fine-tuned)
+        # Load pretrained YOLOv8n model (tidak menggunakan fine-tuned model)
         try:
             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            # self.model = YOLO('yolo11n.pt')Add commentMore actions
-            # # Fine-tune directly if needed
-            # self.model.train(
-            #     data="dataset-train/person detection/data.yaml",
-            #     epochs=50,
-            #     batch=16,
-            #     imgsz=640,
-            #     lr0=0.001,
-            #     patience=10,
-            #     project="runs/train",
-            #     name="yolov11n_custom",
-            #     exist_ok=True
-            # )
-            self.model = YOLO('runs/train/yolov11n_custom/weights/best.pt')
+            # Menggunakan model YOLO pretrained standar
+            self.model = YOLO('yolov8n.pt')
             self.model.to(self.device)
+            print(f"Loaded pretrained YOLO model on {self.device}")
         except Exception as e:
-            print(f"Error loading or training YOLOv11n model: {e}")
+            print(f"Error loading YOLO model: {e}")
             self.model = None
 
     def detect(self, frame):
@@ -42,7 +31,7 @@ class PersonDetector:
         for r in results:
             for box in r.boxes:
                 cls = int(box.cls[0])
-                if cls == 0:  # class 0 is 'person'
+                if cls == 0:  # class 0 is 'person' in COCO dataset
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                     bboxes.append((x1, y1, x2, y2))
         return bboxes

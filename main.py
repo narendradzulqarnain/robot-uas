@@ -64,31 +64,31 @@ def main():
         person_labels = ["person"] * len(person_bboxes)
 
         # 2. Face detection on the whole frame
-        face_bboxes = face_detector.detect(frame)
-        face_crops = []
-        valid_face_indices = []
-        for idx, (x1, y1, x2, y2) in enumerate(face_bboxes):
-            face_img = frame[y1:y2, x1:x2]
-            # Only add valid crops
-            if face_img is not None and face_img.size > 0 and face_img.shape[0] > 0 and face_img.shape[1] > 0:
-                face_crops.append(face_img)
-                valid_face_indices.append(idx)
-        # Batch face recognition for all valid faces
-        face_labels = ["Unknown"] * len(face_bboxes)
-        if face_crops:
-            batch_labels = face_recognizer.recognize_batch(face_crops)
-            for i, label in zip(valid_face_indices, batch_labels):
-                face_labels[i] = label
+        # face_bboxes = face_detector.detect(frame)
+        # face_crops = []
+        # valid_face_indices = []
+        # for idx, (x1, y1, x2, y2) in enumerate(face_bboxes):
+        #     face_img = frame[y1:y2, x1:x2]
+        #     # Only add valid crops
+        #     if face_img is not None and face_img.size > 0 and face_img.shape[0] > 0 and face_img.shape[1] > 0:
+        #         face_crops.append(face_img)
+        #         valid_face_indices.append(idx)
+        # # Batch face recognition for all valid faces
+        # face_labels = ["Unknown"] * len(face_bboxes)
+        # if face_crops:
+        #     batch_labels = face_recognizer.recognize_batch(face_crops)
+        #     for i, label in zip(valid_face_indices, batch_labels):
+        #         face_labels[i] = label
 
         # 3. Crowd density calculation
-        # density, crowded = crowd_calculator.calculate(person_bboxes)
+        density, crowded = crowd_calculator.calculate(person_bboxes)
 
         # # 4. Auto recording logic
         # auto_recorder.update(crowded, frame)
 
         # 5. Visualization
-        # draw_bboxes(frame, person_bboxes, person_labels)
-        draw_bboxes(frame, face_bboxes, face_labels)
+        draw_bboxes(frame, person_bboxes, person_labels)
+        # draw_bboxes(frame, face_bboxes, face_labels)
 
         # Calculate and show FPS
         if frame_count % 10 == 0:
@@ -98,7 +98,7 @@ def main():
         cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0), 2)
         
 
-        # cv2.putText(frame, f"Density: {density:.2f} | Crowded: {crowded}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255) if crowded else (0,255,0), 2)
+        cv2.putText(frame, f"Density: {density:.2f} | Crowded: {crowded}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255) if crowded else (0,255,0), 3)
         cv2.imshow("robot-uas", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

@@ -45,35 +45,4 @@ class FaceDetector:
             print(f"Error in YuNet face detection: {e}")
             return []
 
-    # def detect_with_landmarks(self, image):
-    #     """
-    #     Detect faces and landmarks in an image using MTCNN.
-    #     Returns: tuple of (list of face bounding boxes, list of landmarks)
-    #     """
-    #     if image is None or image.size == 0:
-    #         return [], []
-    #     try:
-    #         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    #         boxes, probs, landmarks = self.mtcnn.detect(rgb_image, landmarks=True)
-    #         if boxes is None:
-    #             return [], []
-    #         bboxes = []
-    #         valid_landmarks = []
-    #         for i, (box, prob, landmark) in enumerate(zip(boxes, probs, landmarks)):
-    #             if prob < 0.8:
-    #                 continue
-    #             x1, y1, x2, y2 = map(int, box.tolist())
-    #             x1 = max(0, x1)
-    #             y1 = max(0, y1)
-    #             x2 = min(image.shape[1], x2)
-    #             y2 = min(image.shape[0], y2)
-    #             if x2 <= x1 or y2 <= y1:
-    #                 continue
-    #             bboxes.append((x1, y1, x2, y2))
-    #             valid_landmarks.append(landmark)
-    #         return bboxes, valid_landmarks
-    #     except Exception as e:
-    #         print(f"Error in MTCNN landmark detection: {e}")
-    #         return [], []
-
 
