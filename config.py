@@ -8,5 +8,5 @@ class Config:
     # Path to your face recognition database
     FACE_DB_PATH = "dataset-train/face recognition/Face Recognition - 2.v3-grayscaled-4-people.folder/train/"
     # Default video file for testing
-    VIDEO_FILE = "test.mp4"
+    VIDEO_FILE = "train.mp4"
     # Add more config values as needed

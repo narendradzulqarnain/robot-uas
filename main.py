@@ -1,20 +1,14 @@
 """
-Main entry point for the robot-uas project.
-Handles input mode selection and coordinates the detection pipeline.
+Face recognition module for robot-uas project.
+Optimized for fast video playback with RetinaFace detector.
 """
-
 import cv2
 import sys
-
-import numpy as np
+import time
 from config import Config
-from person_detection import PersonDetector
-from crowd_density import CrowdDensityCalculator
 from face_detection import FaceDetector
 from face_recognition import FaceRecognizer
-from auto_record import AutoRecorder
 from utils import draw_bboxes
-
 
 def select_input_mode():
     print("Select input mode:")
@@ -35,33 +29,6 @@ def select_input_mode():
         print("Invalid mode. Exiting.")
         sys.exit(1)
 
-def nms(bboxes, iou_threshold=0.3):
-    """Non-Maximum Suppression untuk menghilangkan deteksi duplikat"""
-    if len(bboxes) == 0:
-        return []
-    bboxes = np.array(bboxes)
-    x1 = bboxes[:, 0]
-    y1 = bboxes[:, 1]
-    x2 = bboxes[:, 2]
-    y2 = bboxes[:, 3]
-    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
-    order = areas.argsort()[::-1]
-    keep = []
-    while order.size > 0:
-        i = order[0]
-        keep.append(i)
-        xx1 = np.maximum(x1[i], x1[order[1:]])
-        yy1 = np.maximum(y1[i], y1[order[1:]])
-        xx2 = np.minimum(x2[i], x2[order[1:]])
-        yy2 = np.minimum(y2[i], y2[order[1:]])
-        w = np.maximum(0, xx2 - xx1 + 1)
-        h = np.maximum(0, yy2 - yy1 + 1)
-        inter = w * h
-        ovr = inter / (areas[i] + areas[order[1:]] - inter)
-        inds = np.where(ovr <= iou_threshold)[0]
-        order = order[inds + 1]
-    return [tuple(map(int, bboxes[i])) for i in keep]
-
 def main():
     cap = select_input_mode()
     if not cap.isOpened():
@@ -70,76 +37,82 @@ def main():
 
     # Initialize modules
     config = Config()
-    person_detector = PersonDetector(config)
-    crowd_calculator = CrowdDensityCalculator(config)
     face_detector = FaceDetector(config)
     face_recognizer = FaceRecognizer(config)
-    auto_recorder = AutoRecorder(config)
-    
-    # Performance variables
-    process_every_n_frames = 5  # Hanya proses 1 dari setiap N frame
-    frame_count = 0
-    last_detection_results = {
-        'person_bboxes': [],
-        'person_labels': [],
-        'face_bboxes': [],
-        'face_labels': [],
-        'density': 0,
-        'crowded': False
-    }
+
+    frame_counter = 0
+    process_every_n_frames = 3  # Proses setiap 3 frame
+    target_width = 480          # Resize frame untuk deteksi
+
+    # FPS calculation
+    fps_start_time = time.time()
+    fps_counter = 0
+    fps = 0
+
+    face_bboxes = []
+    face_labels = []
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-            
-        frame_count += 1
-        process_current_frame = (frame_count % process_every_n_frames == 0)
-        
-        # Proses deteksi hanya pada beberapa frame
-        if process_current_frame:
-            # ------ PERSON DETECTION ------
-            person_bboxes = person_detector.detect(frame)
-            person_labels = ["person"] * len(person_bboxes)
-            
-            # ------ FACE DETECTION ------
-            face_bboxes = face_detector.detect(frame)
-            face_bboxes = nms(face_bboxes, iou_threshold=0.3)
-            
-            # ------ FACE RECOGNITION ------
-            face_labels = []
-            for bbox in face_bboxes:
-                x1, y1, x2, y2 = bbox
-                face_img = frame[y1:y2, x1:x2]
-                if face_img is not None and face_img.size > 0:
-                    label = face_recognizer.recognize(face_img)
-                    face_labels.append(label if label else "Unknown")
-                else:
-                    face_labels.append("Unknown")
 
-            # ------ CROWD DENSITY ------
-            density, crowded = crowd_calculator.calculate(person_bboxes)
-            
-            # Update last detection results
-            last_detection_results = {
-                'person_bboxes': person_bboxes,
-                'person_labels': person_labels,
-                'face_bboxes': face_bboxes,
-                'face_labels': face_labels,
-                'density': density,
-                'crowded': crowded
-            }
-        
-        # Always use the most recent detection results for display
-        auto_recorder.update(last_detection_results['crowded'], frame)
-        draw_bboxes(frame, last_detection_results['face_bboxes'], last_detection_results['face_labels'])
-        
-        # Show crowd density info
-        cv2.putText(frame, f"Density: {last_detection_results['density']:.2f} | Crowded: {last_detection_results['crowded']}", 
-                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 
-                   (0,0,255) if last_detection_results['crowded'] else (0,255,0), 2)
-        
-        cv2.imshow("robot-uas", frame)
+        frame_counter += 1
+        fps_counter += 1
+
+        # Calculate FPS every second
+        if time.time() - fps_start_time > 1.0:
+            fps = fps_counter / (time.time() - fps_start_time)
+            fps_counter = 0
+            fps_start_time = time.time()
+
+        display_frame = frame.copy()
+
+        # Only process every nth frame for detection
+        if frame_counter % process_every_n_frames == 0:
+            h, w = frame.shape[:2]
+            scale = target_width / w
+            small_frame = cv2.resize(frame, (target_width, int(h * scale)))
+            faces = face_detector.detect(small_frame)
+            faces_original_size = []
+            for fx1, fy1, fx2, fy2 in faces:
+                x1 = int(fx1 / scale)
+                y1 = int(fy1 / scale)
+                x2 = int(fx2 / scale)
+                y2 = int(fy2 / scale)
+                faces_original_size.append((x1, y1, x2, y2))
+            face_bboxes = []
+            face_labels = []
+            for fx1, fy1, fx2, fy2 in faces_original_size:
+                valid_fx1 = max(0, fx1)
+                valid_fy1 = max(0, fy1)
+                valid_fx2 = min(frame.shape[1], fx2)
+                valid_fy2 = min(frame.shape[0], fy2)
+                if valid_fx2 <= valid_fx1 or valid_fy2 <= valid_fy1:
+                    continue
+                padding = int((valid_fx2 - valid_fx1) * 0.1)
+                display_fx1 = max(0, valid_fx1 - padding)
+                display_fy1 = max(0, valid_fy1 - padding)
+                display_fx2 = min(frame.shape[1], valid_fx2 + padding)
+                display_fy2 = min(frame.shape[0], valid_fy2 + padding)
+                try:
+                    face_img = frame[valid_fy1:valid_fy2, valid_fx1:valid_fx2]
+                    if face_img is None or face_img.size == 0 or face_img.shape[0] == 0 or face_img.shape[1] == 0:
+                        continue
+                    label = face_recognizer.recognize(face_img)
+                    face_bboxes.append((display_fx1, display_fy1, display_fx2, display_fy2))
+                    face_labels.append(label if label else "Unknown")
+                except Exception as e:
+                    print(f"Error processing face: {e}")
+
+        # Draw bounding boxes and labels
+        draw_bboxes(display_frame, face_bboxes, face_labels)
+
+        # Display performance metrics
+        cv2.putText(display_frame, f"FPS: {fps:.1f}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+        cv2.imshow("Face Recognition", display_frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 

@@ -5,3 +5,5 @@ facenet-pytorch
 torch
 numpy
 scipy
+insightface
+onnxruntime
