@@ -48,7 +48,9 @@ def main():
     face_detector = FaceDetector(config)
     face_recognizer = FaceRecognizer(config)
     auto_recorder = AutoRecorder(config)
-
+    show_person_detection = True
+    show_face_detection = True
+    show_density_heatmap = True
     prev_time = time.time()
     frame_count = 0
     fps = 0
@@ -58,7 +60,7 @@ def main():
         if not ret:
             break
         frame_count += 1
-
+        display_frame = frame.copy()
         # 1. Person detection (YOLO)
         person_bboxes = person_detector.detect(frame)
         person_labels = ["person"] * len(person_bboxes)
@@ -81,28 +83,82 @@ def main():
                 face_labels[i] = label
 
         # 3. Crowd density calculation
-        # density, crowded = crowd_calculator.calculate(person_bboxes)
-
-        # # 4. Auto recording logic
-        # auto_recorder.update(crowded, frame)
-
+        density, crowded = crowd_calculator.calculate(person_bboxes)
+        if show_density_heatmap and len(person_bboxes) > 1:
+            # Apply density heatmap visualization
+            display_frame = crowd_calculator.draw_crowd_indicator(display_frame, person_bboxes)
+            
+            # Display density information with color coding
+            status_color = (0, 0, 255) if crowded else (0, 255, 0)  # Red if crowded, green otherwise
+            status_text = f"Density: {density:.2f} | {'CROWDED' if crowded else 'Normal'}"
+            
+            cv2.putText(display_frame, status_text, 
+                    (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 
+                    status_color, 2)
+        
+        
         # 5. Visualization
-        # draw_bboxes(frame, person_bboxes, person_labels)
-        draw_bboxes(frame, face_bboxes, face_labels)
+        if show_person_detection and person_bboxes:
+            draw_bboxes(display_frame, person_bboxes, person_labels)
+            
+        if show_face_detection and face_bboxes:
+            draw_bboxes(display_frame, face_bboxes, face_labels)
 
         # Calculate and show FPS
         if frame_count % 10 == 0:
             curr_time = time.time()
             fps = 10 / (curr_time - prev_time)
             prev_time = curr_time
-        cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0), 2)
-        
-
+        cv2.putText(display_frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0), 2)
+        # Auto recording logic
+        auto_recorder.update(crowded, frame, display_frame)
+        # Add recording indicator if recording
+        if auto_recorder.recording:
+            # Get frame dimensions
+            h, w = display_frame.shape[:2]
+            
+            # Draw red blinking "REC" indicator with circle
+            if int(time.time()) % 2 == 0:  # Blink every second
+                # Position for bottom right (with padding)
+                circle_x = w - 20
+                circle_y = h - 20
+                text_x = w - 100
+                text_y = h - 25
+                
+                # Draw red circle
+                cv2.circle(display_frame, (circle_x, circle_y), 10, (0, 0, 255), -1)
+                
+        status_text = []
+        if show_person_detection:
+            status_text.append("Person: ON")
+        if show_face_detection:
+            status_text.append("Face: ON")
+        if show_density_heatmap:
+            status_text.append("Density: ON")
+        # if auto_recorder and auto_recorder.recording:
+        #     status_text.append("REC")
+        status_str = " | ".join(status_text)
+        cv2.putText(frame, status_str, 
+                  (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+                  0.7, (0, 165, 255), 2)
         # cv2.putText(frame, f"Density: {density:.2f} | Crowded: {crowded}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255) if crowded else (0,255,0), 2)
-        cv2.imshow("robot-uas", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        cv2.imshow("robot-uas", display_frame)
+        # Key handling
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
             break
+        elif key == ord('p'):
+            show_person_detection = not show_person_detection
+            print(f"Person detection visualization: {'ON' if show_person_detection else 'OFF'}")
+        elif key == ord('f'):
+            show_face_detection = not show_face_detection
+            print(f"Face detection visualization: {'ON' if show_face_detection else 'OFF'}")
+        elif key == ord('d'):
+            show_density_heatmap = not show_density_heatmap
+            print(f"Density heatmap: {'ON' if show_density_heatmap else 'OFF'}")
 
+    if auto_recorder.recording:
+        auto_recorder.stop_recording()
     cap.release()
     cv2.destroyAllWindows()
 

@@ -7,3 +7,34 @@ venv310
 keliling_kelas_data_train.mp4
 
 keliling_kelas_data_test - lower fps.mp4
+
+Robotik
+
+Robotik.zip
+output_video_2.mp4
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments (already have venv310, but general pattern)
+venv/
+env/
+ENV/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
