@@ -42,7 +42,7 @@ def main():
 
     frame_counter = 0
     process_every_n_frames = 3  # Proses setiap 3 frame
-    target_width = 480          # Resize frame untuk deteksi
+    target_width = 640     # Resize frame untuk deteksi
 
     # FPS calculation
     fps_start_time = time.time()
