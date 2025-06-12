@@ -55,8 +55,8 @@ def evaluate_realtime(video_path, model_path, threshold=0.65):
     
     # --- Setup MTCNN ---
     mtcnn = MTCNN(
-        keep_all=True, device=device, min_face_size=40,
-        thresholds=[0.6, 0.7, 0.7]
+        keep_all=True, device=device, min_face_size=20,
+        thresholds=[0.7, 0.7, 0.8]
     )
     
     # --- Buka Sumber Video ---
@@ -66,7 +66,7 @@ def evaluate_realtime(video_path, model_path, threshold=0.65):
         return
 
     # --- Variabel untuk Optimisasi & Smoothing ---
-    PROCESS_EVERY_N_FRAMES = 2  # Hanya proses setiap 2 frame untuk kecepatan
+    PROCESS_EVERY_N_FRAMES = 1  # Hanya proses setiap 2 frame untuk kecepatan
     RESIZE_FACTOR = 0.75        # Ubah ukuran frame untuk deteksi lebih cepat
     face_buffer = defaultdict(lambda: deque(maxlen=10)) # Buffer untuk temporal smoothing
     
@@ -86,6 +86,8 @@ def evaluate_realtime(video_path, model_path, threshold=0.65):
         # Hanya proses deteksi pada frame tertentu
         if frame_count % PROCESS_EVERY_N_FRAMES == 0:
             small_frame = cv2.resize(frame, (0, 0), fx=RESIZE_FACTOR, fy=RESIZE_FACTOR)
+            if len(small_frame.shape) == 2 or small_frame.shape[2] == 1:
+                small_frame = cv2.cvtColor(small_frame, cv2.COLOR_GRAY2BGR)
             rgb_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
             
             # Deteksi wajah
