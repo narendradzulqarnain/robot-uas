@@ -147,19 +147,19 @@ class FaceRecognizer:
                 return best_match
         return "Unknown"
 
-    def recognize(self, img):
-        """
-        Recognize a face in the given image.
-        """
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
-        if img.shape[0] != 160 or img.shape[1] != 160:
-            img = self._pad_to_160(img)
-        img_tensor = torch.tensor(img).unsqueeze(0).unsqueeze(0).float() / 255.0  # shape: (1, 1, 160, 160)
-        img_tensor = img_tensor.to(self.device)
-        img_tensor = img_tensor.repeat(1, 3, 1, 1)  # Repeat channel for FaceNet compatibility
-        with torch.no_grad():
-            emb = self.model(img_tensor).squeeze().cpu().numpy()
-        return self._recognize_embedding(emb)
+    # def recognize(self, img):
+    #     """
+    #     Recognize a face in the given image.
+    #     """
+    #     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+    #     if img.shape[0] != 160 or img.shape[1] != 160:
+    #         img = self._pad_to_160(img)
+    #     img_tensor = torch.tensor(img).unsqueeze(0).unsqueeze(0).float() / 255.0  # shape: (1, 1, 160, 160)
+    #     img_tensor = img_tensor.to(self.device)
+    #     img_tensor = img_tensor.repeat(1, 3, 1, 1)  # Repeat channel for FaceNet compatibility
+    #     with torch.no_grad():
+    #         emb = self.model(img_tensor).squeeze().cpu().numpy()
+    #     return self._recognize_embedding(emb)
 
     def recognize_batch(self, imgs):
         """
