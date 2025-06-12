@@ -11,6 +11,19 @@ class PersonDetector:
         # Load YOLOv11n model (pretrained or fine-tuned)
         try:
             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            # self.model = YOLO('yolo11n.pt')Add commentMore actions
+            # # Fine-tune directly if needed
+            # self.model.train(
+            #     data="dataset-train/person detection/data.yaml",
+            #     epochs=50,
+            #     batch=16,
+            #     imgsz=640,
+            #     lr0=0.001,
+            #     patience=10,
+            #     project="runs/train",
+            #     name="yolov11n_custom",
+            #     exist_ok=True
+            # )
             self.model = YOLO('runs/train/yolov11n_custom/weights/best.pt')
             self.model.to(self.device)
         except Exception as e:

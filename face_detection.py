@@ -1,58 +1,79 @@
 """
-MediaPipe-based face detection module.
+Face detection module using OpenCV's YuNet.
 """
 
 import numpy as np
-import mediapipe as mp
+import torch
 import cv2
-
-def nms(bboxes, iou_threshold=0.4):
-    if len(bboxes) == 0:
-        return []
-    bboxes = np.array(bboxes)
-    x1 = bboxes[:, 0]
-    y1 = bboxes[:, 1]
-    x2 = bboxes[:, 2]
-    y2 = bboxes[:, 3]
-    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
-    order = areas.argsort()[::-1]
-    keep = []
-    while order.size > 0:
-        i = order[0]
-        keep.append(i)
-        xx1 = np.maximum(x1[i], x1[order[1:]])
-        yy1 = np.maximum(y1[i], y1[order[1:]])
-        xx2 = np.minimum(x2[i], x2[order[1:]])
-        yy2 = np.minimum(y2[i], y2[order[1:]])
-        w = np.maximum(0, xx2 - xx1 + 1)
-        h = np.maximum(0, yy2 - yy1 + 1)
-        inter = w * h
-        ovr = inter / (areas[i] + areas[order[1:]] - inter)
-        inds = np.where(ovr <= iou_threshold)[0]
-        order = order[inds + 1]
-    return [tuple(map(int, bboxes[i])) for i in keep]
 
 class FaceDetector:
     def __init__(self, config=None):
-        # MediaPipe does not support CUDA, so fallback to CPU
-        self.face_detection = mp.solutions.face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
+        # Use YuNet from OpenCV for face detection
+        self.model_path = './face_detection_yunet_2023mar.onnx'
+        try:
+            self.face_detector = cv2.FaceDetectorYN_create(
+                self.model_path,
+                "",
+                (300, 300),
+                score_threshold=0.5
+            )
+        except Exception as e:
+            print(f"Error loading YuNet model: {e}")
+            self.face_detector = None
 
-    def detect(self, person_crop):
+    def detect(self, image):
         """
-        Detect faces in a cropped person image using MediaPipe Face Detection.
+        Detect faces in an image using YuNet.
         Returns: list of face bounding boxes [(x1, y1, x2, y2), ...]
         """
-        results = self.face_detection.process(cv2.cvtColor(person_crop, cv2.COLOR_BGR2RGB))
-        bboxes = []
-        if results.detections:
-            h, w, _ = person_crop.shape
-            for detection in results.detections:
-                bboxC = detection.location_data.relative_bounding_box
-                x1 = int(bboxC.xmin * w)
-                y1 = int(bboxC.ymin * h)
-                x2 = int((bboxC.xmin + bboxC.width) * w)
-                y2 = int((bboxC.ymin + bboxC.height) * h)
-                bboxes.append((x1, y1, x2, y2))
-        # Apply NMS to remove overlapping boxes
-        bboxes = nms(bboxes, iou_threshold=0.2)
-        return bboxes
+        if image is None or image.size == 0 or self.face_detector is None:
+            return []
+        h, w = image.shape[:2]
+        self.face_detector.setInputSize((w, h))
+        try:
+            retval, faces = self.face_detector.detect(image)
+            bboxes = []
+            if faces is not None and len(faces) > 0:
+                for face in faces:
+                    x, y, w, h, score = face[:5]
+                    if score < 0.5:
+                        continue
+                    x1, y1, x2, y2 = int(x), int(y), int(x + w), int(y + h)
+                    bboxes.append((x1, y1, x2, y2))
+            return bboxes
+        except Exception as e:
+            print(f"Error in YuNet face detection: {e}")
+            return []
+
+    # def detect_with_landmarks(self, image):
+    #     """
+    #     Detect faces and landmarks in an image using MTCNN.
+    #     Returns: tuple of (list of face bounding boxes, list of landmarks)
+    #     """
+    #     if image is None or image.size == 0:
+    #         return [], []
+    #     try:
+    #         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    #         boxes, probs, landmarks = self.mtcnn.detect(rgb_image, landmarks=True)
+    #         if boxes is None:
+    #             return [], []
+    #         bboxes = []
+    #         valid_landmarks = []
+    #         for i, (box, prob, landmark) in enumerate(zip(boxes, probs, landmarks)):
+    #             if prob < 0.8:
+    #                 continue
+    #             x1, y1, x2, y2 = map(int, box.tolist())
+    #             x1 = max(0, x1)
+    #             y1 = max(0, y1)
+    #             x2 = min(image.shape[1], x2)
+    #             y2 = min(image.shape[0], y2)
+    #             if x2 <= x1 or y2 <= y1:
+    #                 continue
+    #             bboxes.append((x1, y1, x2, y2))
+    #             valid_landmarks.append(landmark)
+    #         return bboxes, valid_landmarks
+    #     except Exception as e:
+    #         print(f"Error in MTCNN landmark detection: {e}")
+    #         return [], []
+
+

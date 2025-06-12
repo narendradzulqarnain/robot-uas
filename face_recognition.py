@@ -160,3 +160,28 @@ class FaceRecognizer:
         with torch.no_grad():
             emb = self.model(img_tensor).squeeze().cpu().numpy()
         return self._recognize_embedding(emb)
+
+    def recognize_batch(self, imgs):
+        """
+        Recognize a batch of face images. imgs: list of np.ndarray (BGR or grayscale)
+        Returns: list of labels (str)
+        """
+        if not imgs:
+            return []
+        # Convert all to grayscale and pad in one go (optimized)
+        processed = [
+            cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+            for img in imgs
+        ]
+        processed = [
+            self._pad_to_160(img) if img.shape[0] != 160 or img.shape[1] != 160 else img
+            for img in processed
+        ]
+        batch = np.stack(processed, axis=0)  # (N, 160, 160)
+        batch_tensor = torch.from_numpy(batch).unsqueeze(1).float() / 255.0  # (N, 1, 160, 160)
+        batch_tensor = batch_tensor.to(self.device)
+        batch_tensor = batch_tensor.repeat(1, 3, 1, 1)  # (N, 3, 160, 160)
+        with torch.no_grad():
+            embs = self.model(batch_tensor).cpu().numpy()  # (N, 512)
+        labels = [self._recognize_embedding(emb) for emb in embs]
+        return labels
