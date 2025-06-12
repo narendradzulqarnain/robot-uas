@@ -27,7 +27,7 @@ def find_best_match_adaptive(embedding, known_embeddings, known_labels):
         return known_labels[best_idx], best_sim
     return "Unknown", best_sim
 
-def evaluate_realtime(video_path, model_path, threshold=0.65):
+def evaluate_realtime(video_path, model_path, blur_intensity=25):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Menggunakan device: {device}")
     
@@ -68,8 +68,8 @@ def evaluate_realtime(video_path, model_path, threshold=0.65):
         return
 
     # --- Variabel untuk Optimisasi & Smoothing ---
-    PROCESS_EVERY_N_FRAMES = 2  # Hanya proses setiap 2 frame untuk kecepatan
-    RESIZE_FACTOR = 0.75        # Ubah ukuran frame untuk deteksi lebih cepat
+    PROCESS_EVERY_N_FRAMES = 1  # Hanya proses setiap 2 frame untuk kecepatan
+    RESIZE_FACTOR = 1        # Ubah ukuran frame untuk deteksi lebih cepat
     face_buffer = defaultdict(lambda: deque(maxlen=10)) # Buffer untuk temporal smoothing
     
     frame_count = 0
@@ -124,7 +124,13 @@ def evaluate_realtime(video_path, model_path, threshold=0.65):
             face_buffer[face_key].append(label)
             smoothed_label = max(set(face_buffer[face_key]), key=list(face_buffer[face_key]).count)
 
-            color = (0, 255, 0) if smoothed_label != "Unknown" else (0, 0, 255)
+            # Jika wajah tidak dikenal, blur wajahnya
+            if smoothed_label == "Unknown":
+                display_frame = blur_face(display_frame, (x1, y1, x2, y2), blur_factor=blur_intensity)
+                color = (0, 0, 255)  # Merah untuk tidak dikenal
+            else:
+                color = (0, 255, 0)  # Hijau untuk dikenal
+            
             cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
             
             label_text = f"{smoothed_label} ({confidence:.2f})"
@@ -137,6 +143,35 @@ def evaluate_realtime(video_path, model_path, threshold=0.65):
             
     cap.release()
     cv2.destroyAllWindows()
+
+def blur_face(image, box, blur_factor=25):
+    """
+    Menerapkan Gaussian blur pada area wajah tertentu dalam gambar
+    
+    Parameters:
+    - image: Frame/gambar yang akan dimodifikasi
+    - box: Bounding box wajah (x1, y1, x2, y2)
+    - blur_factor: Intensitas blur (makin besar makin blur)
+    
+    Returns:
+    - Image dengan area wajah yang sudah di-blur
+    """
+    x1, y1, x2, y2 = [int(coord) for coord in box]
+    
+    # Pastikan koordinat dalam batas frame
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(image.shape[1], x2), min(image.shape[0], y2)
+    
+    # Crop bagian wajah
+    face_region = image[y1:y2, x1:x2]
+    
+    # Terapkan Gaussian blur
+    blurred_face = cv2.GaussianBlur(face_region, (blur_factor, blur_factor), 0)
+    
+    # Masukkan kembali ke gambar asli
+    image[y1:y2, x1:x2] = blurred_face
+    
+    return image
 
 if __name__ == "__main__":
     # Gunakan 0 untuk webcam, atau berikan path ke file video

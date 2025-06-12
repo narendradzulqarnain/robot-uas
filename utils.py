@@ -4,7 +4,6 @@ import numpy as np
 from PIL import Image
 import torch
 from torchvision import datasets, transforms
-from facenet_model import FaceNet
 
 def load_model(model_path, embedding_size=None):
     """Load model with automatic embedding size detection"""
