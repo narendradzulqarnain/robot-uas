@@ -1,0 +1,7 @@
+# requirements.txt for robot-uas
+ultralytics
+opencv-python
+facenet-pytorch
+torch
+numpy
+scipy
