@@ -75,21 +75,21 @@ def train_finetune_model(model, train_loader, criterion, optimizer, scheduler, d
 def main():
     # --- Konfigurasi ---
     data_dir = './img_train'
-    num_epochs = 40  # Jumlah epoch bisa lebih sedikit untuk fine-tuning
+    num_epochs = 60  # Jumlah epoch bisa lebih sedikit untuk fine-tuning
     
     # PENTING: Gunakan learning rate yang SANGAT KECIL untuk fine-tuning
-    learning_rate = 1e-5 
+    learning_rate = 5e-6
     
     batch_size = 32
-    margin = 0.6
+    margin = 0.5
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Menggunakan device: {device}")
 
     # --- Memuat Model Pretrained ---
     # 'vggface2' atau 'casia-webface' adalah pilihan dataset pretrained
-    print("Memuat model InceptionResnetV1 pretrained (vggface2)...")
-    model = InceptionResnetV1(pretrained='vggface2').to(device)
+    print("Memuat model InceptionResnetV1 pretrained casia-webface...")
+    model = InceptionResnetV1(pretrained='casia-webface').to(device)
     
     # --- Data Augmentation dan Loader ---
     transform = transforms.Compose([
@@ -109,7 +109,7 @@ def main():
         dataset, 
         batch_size=batch_size, 
         sampler=sampler, 
-        num_workers=4,
+        num_workers=8,
         pin_memory=True,
         drop_last=True
     )

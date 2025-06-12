@@ -6,20 +6,22 @@ from PIL import Image
 from collections import deque, defaultdict
 import time
 
-def find_best_match_vectorized(embedding, known_embeddings, known_labels, threshold):
-    """Kalkulasi kemiripan secara vectorized untuk kecepatan."""
-    if len(known_embeddings) == 0:
-        return "Unknown", 0.0
-    
-    # Normalisasi L2 untuk kalkulasi cosine similarity yang benar
-    embedding_norm = np.linalg.norm(embedding)
-    known_embeddings_norm = np.linalg.norm(known_embeddings, axis=1)
-    
-    # Kalkulasi cosine similarity untuk semua embedding yang diketahui
-    similarities = np.dot(known_embeddings, embedding) / (known_embeddings_norm * embedding_norm + 1e-8)
+def find_best_match_adaptive(embedding, known_embeddings, known_labels):
+    """Menggunakan threshold yang dinamis berdasarkan skor kecocokan."""
+    similarities = np.dot(known_embeddings, embedding) / (
+        np.linalg.norm(known_embeddings, axis=1) * np.linalg.norm(embedding) + 1e-8)
     
     best_idx = np.argmax(similarities)
     best_sim = similarities[best_idx]
+    
+    # Threshold dinamis: lebih tinggi jika ada skor similarity yang hampir sama
+    sorted_sim = np.sort(similarities)[::-1]
+    if len(sorted_sim) > 1:
+        gap = sorted_sim[0] - sorted_sim[1]  # Selisih dengan runner-up
+        # Jika gap kecil, kita butuh keyakinan lebih tinggi
+        threshold = 0.60 if gap > 0.15 else 0.70
+    else:
+        threshold = 0.65
     
     if best_sim > threshold:
         return known_labels[best_idx], best_sim
@@ -106,8 +108,8 @@ def evaluate_realtime(video_path, model_path, threshold=0.65):
                     
                     current_detections = []
                     for i, box in enumerate(boxes):
-                        label, conf = find_best_match_vectorized(
-                            embeddings[i], known_embeddings, known_labels, threshold
+                        label, conf = find_best_match_adaptive(
+                            embeddings[i], known_embeddings, known_labels
                         )
                         current_detections.append({'box': box, 'label': label, 'conf': conf})
                     last_detections = current_detections
