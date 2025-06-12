@@ -1,10 +1,11 @@
 """
-MediaPipe-based face detection module.
+MTCNN-based face detection module.
 """
 
 import numpy as np
-import mediapipe as mp
 import cv2
+from facenet_pytorch import MTCNN
+import torch
 
 def nms(bboxes, iou_threshold=0.4):
     if len(bboxes) == 0:
@@ -32,27 +33,114 @@ def nms(bboxes, iou_threshold=0.4):
         order = order[inds + 1]
     return [tuple(map(int, bboxes[i])) for i in keep]
 
+
 class FaceDetector:
     def __init__(self, config=None):
-        # MediaPipe does not support CUDA, so fallback to CPU
-        self.face_detection = mp.solutions.face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
-
-    def detect(self, person_crop):
+        # Use CPU device for MTCNN (more compatible)
+        self.device = torch.device('cpu')
+        
+        # Initialize MTCNN with optimized parameters
+        self.mtcnn = MTCNN(
+            keep_all=True,                    # Return all detected faces
+            min_face_size=30,                 # Minimum face size in pixels
+            thresholds=[0.6, 0.7, 0.8],       # Detection thresholds for the 3 stages
+            factor=0.709,                     # Scale factor between image pyramids
+            post_process=True,                # Apply post-processing
+            device=self.device
+        )
+        
+    def detect(self, image):
         """
-        Detect faces in a cropped person image using MediaPipe Face Detection.
+        Detect faces in an image using MTCNN.
         Returns: list of face bounding boxes [(x1, y1, x2, y2), ...]
         """
-        results = self.face_detection.process(cv2.cvtColor(person_crop, cv2.COLOR_BGR2RGB))
-        bboxes = []
-        if results.detections:
-            h, w, _ = person_crop.shape
-            for detection in results.detections:
-                bboxC = detection.location_data.relative_bounding_box
-                x1 = int(bboxC.xmin * w)
-                y1 = int(bboxC.ymin * h)
-                x2 = int((bboxC.xmin + bboxC.width) * w)
-                y2 = int((bboxC.ymin + bboxC.height) * h)
+        # Check if image is valid
+        if image is None or image.size == 0:
+            return []
+            
+        # Ensure we have a valid image
+        try:
+            # MTCNN expects RGB format
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            # Run detection (boxes will be in format [x1, y1, x2, y2])
+            boxes, probs = self.mtcnn.detect(rgb_image)
+            
+            # No faces detected
+            if boxes is None:
+                print("MTCNN: No faces detected")
+                return []
+                
+            bboxes = []
+            # Process detected faces
+            for i, (box, prob) in enumerate(zip(boxes, probs)):
+                # Skip low confidence detections
+                if prob < 0.8:
+                    continue
+                    
+                # Convert to integers and ensure coordinates are valid
+                x1, y1, x2, y2 = map(int, box.tolist())
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(image.shape[1], x2)
+                y2 = min(image.shape[0], y2)
+                
+                # Skip invalid boxes
+                if x2 <= x1 or y2 <= y1 or (x2-x1)*(y2-y1) < 900:  # Minimum 30x30 pixels
+                    continue
+                    
                 bboxes.append((x1, y1, x2, y2))
-        # Apply NMS to remove overlapping boxes
-        bboxes = nms(bboxes, iou_threshold=0.2)
-        return bboxes
+            
+            print(f"MTCNN detected {len(bboxes)} faces with confidence")
+            return bboxes
+            
+        except Exception as e:
+            print(f"Error in MTCNN face detection: {e}")
+            return []
+            
+    def detect_with_landmarks(self, image):
+        """
+        Detect faces and their landmarks using MTCNN.
+        Returns: 
+            - list of face bounding boxes [(x1, y1, x2, y2), ...]
+            - list of landmarks (5 points per face)
+        """
+        if image is None or image.size == 0:
+            return [], []
+            
+        try:
+            # Convert to RGB for MTCNN
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            # Run detection with landmarks
+            boxes, probs, landmarks = self.mtcnn.detect(rgb_image, landmarks=True)
+            
+            if boxes is None:
+                return [], []
+                
+            bboxes = []
+            valid_landmarks = []
+            
+            # Process results
+            for i, (box, prob, landmark) in enumerate(zip(boxes, probs, landmarks)):
+                if prob < 0.8:
+                    continue
+                    
+                # Convert coordinates to integers
+                x1, y1, x2, y2 = map(int, box.tolist())
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(image.shape[1], x2)
+                y2 = min(image.shape[0], y2)
+                
+                if x2 <= x1 or y2 <= y1:
+                    continue
+                    
+                bboxes.append((x1, y1, x2, y2))
+                valid_landmarks.append(landmark)
+            
+            return bboxes, valid_landmarks
+            
+        except Exception as e:
+            print(f"Error in MTCNN landmark detection: {e}")
+            return [], []
