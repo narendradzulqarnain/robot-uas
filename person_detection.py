@@ -24,10 +24,10 @@ class PersonDetector:
             #     name="yolov11n_custom",
             #     exist_ok=True
             # )
-            self.model = YOLO('runs/train/yolov11n_custom/weights/best.pt')
+            self.model = YOLO('models/yolo11n.pt')
             self.model.to(self.device)
         except Exception as e:
-            print(f"Error loading or training YOLOv11n model: {e}")
+            print(f"Error loading or training model: {e}")
             self.model = None
 
     def detect(self, frame):
@@ -42,7 +42,7 @@ class PersonDetector:
         for r in results:
             for box in r.boxes:
                 cls = int(box.cls[0])
-                if cls == 0:  # class 0 is 'person'
+                if cls == 0:  # class 0 is 'person' in COCO dataset
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                     bboxes.append((x1, y1, x2, y2))
         return bboxes

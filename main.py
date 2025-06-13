@@ -87,7 +87,7 @@ def main():
         if show_density_heatmap and len(person_bboxes) > 1:
             # Apply density heatmap visualization
             display_frame = crowd_calculator.draw_crowd_indicator(display_frame, person_bboxes)
-            
+            display_frame = crowd_calculator.draw_crowd_highlight(display_frame, person_bboxes)
             # Display density information with color coding
             status_color = (0, 0, 255) if crowded else (0, 255, 0)  # Red if crowded, green otherwise
             status_text = f"Density: {density:.2f} | {'CROWDED' if crowded else 'Normal'}"
@@ -104,12 +104,6 @@ def main():
         if show_face_detection and face_bboxes:
             draw_bboxes(display_frame, face_bboxes, face_labels)
 
-        # Calculate and show FPS
-        if frame_count % 10 == 0:
-            curr_time = time.time()
-            fps = 10 / (curr_time - prev_time)
-            prev_time = curr_time
-        cv2.putText(display_frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0), 2)
         # Auto recording logic
         auto_recorder.update(crowded, frame, display_frame)
         # Add recording indicator if recording
@@ -135,13 +129,12 @@ def main():
             status_text.append("Face: ON")
         if show_density_heatmap:
             status_text.append("Density: ON")
-        # if auto_recorder and auto_recorder.recording:
-        #     status_text.append("REC")
+
         status_str = " | ".join(status_text)
         cv2.putText(frame, status_str, 
                   (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 
                   0.7, (0, 165, 255), 2)
-        # cv2.putText(frame, f"Density: {density:.2f} | Crowded: {crowded}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255) if crowded else (0,255,0), 2)
+    
         cv2.imshow("robot-uas", display_frame)
         # Key handling
         key = cv2.waitKey(1) & 0xFF

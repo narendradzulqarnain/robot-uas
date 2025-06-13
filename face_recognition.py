@@ -9,6 +9,15 @@ import numpy as np
 import os
 import cv2
 
+from facenet_pytorch import InceptionResnetV1
+from sklearn.model_selection import train_test_split
+import torch
+import numpy as np
+import os
+import cv2
+import pickle
+import time
+
 class FaceRecognizer:
     def __init__(self, config):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -18,7 +27,86 @@ class FaceRecognizer:
         self.threshold = 0.65
         self.person_thresholds = {}  # {person_name: threshold}
         self.db_path = config.FACE_DB_PATH
+        
+        # Cache settings
+        self.cache_path = "models/face_recognition_cache.pkl"
+        os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
+        
+        # Try to load from cache first
+        if hasattr(config, 'USE_CACHED_EMBEDDINGS') and config.USE_CACHED_EMBEDDINGS:
+            if self._load_from_cache():
+                print("Successfully loaded face embeddings and thresholds from cache.")
+                return
+        
+        # If loading from cache fails or is disabled, compute from scratch
         self._load_face_db_and_validate()
+        
+        # Save to cache for future use
+        if hasattr(config, 'USE_CACHED_EMBEDDINGS') and config.USE_CACHED_EMBEDDINGS:
+            self._save_to_cache()
+            
+    def _load_from_cache(self):
+        """Try to load embeddings and thresholds from cache file"""
+        if not os.path.exists(self.cache_path):
+            print("Cache file not found. Computing embeddings from scratch.")
+            return False
+            
+        try:
+            # Check if database directory has been modified since cache was created
+            db_modified = max(os.path.getmtime(os.path.join(root, f)) 
+                          for root, _, files in os.walk(self.db_path) 
+                          for f in files if f.lower().endswith(('.jpg', '.png')))
+            cache_created = os.path.getmtime(self.cache_path)
+            
+            if db_modified > cache_created:
+                print("Face database has been modified since cache was created. Rebuilding cache.")
+                return False
+                
+            # Load the cache
+            with open(self.cache_path, 'rb') as f:
+                cached_data = pickle.load(f)
+                
+            # Verify cache compatibility
+            if cached_data.get('db_path') != self.db_path:
+                print("Database path has changed. Rebuilding cache.")
+                return False
+                
+            # Load embeddings and thresholds
+            self.face_db = cached_data['face_db']
+            self.person_thresholds = cached_data['person_thresholds']
+            self.threshold = cached_data.get('threshold', self.threshold)
+            
+            print(f"Loaded face database from cache ({len(self.face_db)} persons):")
+            for person, embeddings in self.face_db.items():
+                thresh = self.person_thresholds.get(person, self.threshold)
+                print(f"  {person}: {len(embeddings)} embeddings, threshold={thresh:.2f}")
+                
+            return True
+            
+        except Exception as e:
+            print(f"Error loading cache: {e}")
+            return False
+            
+    def _save_to_cache(self):
+        """Save embeddings and thresholds to cache file"""
+        try:
+            cache_data = {
+                'face_db': self.face_db,
+                'person_thresholds': self.person_thresholds,
+                'threshold': self.threshold,
+                'db_path': self.db_path,
+                'created': time.time()
+            }
+            
+            with open(self.cache_path, 'wb') as f:
+                pickle.dump(cache_data, f)
+                
+            print(f"Face recognition data saved to cache: {self.cache_path}")
+            return True
+            
+        except Exception as e:
+            print(f"Error saving to cache: {e}")
+            return False
 
     def _load_face_db_and_validate(self):
         print("Loading face database and validating with per-person threshold tuning...")
